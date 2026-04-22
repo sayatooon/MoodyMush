@@ -1,0 +1,2459 @@
+module main
+author unknown
+version 1 0 
+description ''
+variables Servo1 LEDpanel Servo2 ini_deg1 ini_deg2 max_deg1 max_deg2 LED_brightness IR_code_motion IR_code_LED LED_hue LED_saturation current_deg1 current_deg2 set_deg1 set_deg2 speed touch_length touch_state touched_time LED_spot_hue LED_spot_saturation IR_code_mode mode longest_touched_sensor short_touched_sensor long_touch_state mood last_short_touched_time pix_number pix_number_size LED_hue_neutral LED_default_brigthness anger_probability refusal_probability greatjoy_probability max_deg tilt tilt_direction dance_probability play_snaggling_sound play_angry_sound play_startled_sound play_refusal_sound play_greatjoy_sound long_touch_num last_longest_touched_sensor LED_hue_orange LED_hue_blue 
+
+  spec ' ' 'run_LED' 'run_LED _' 'auto' 0
+  spec ' ' 'set_servo' 'set_servo _ _ _ _' 'auto auto auto auto' 14 0 0 10
+  spec ' ' 'set_servos' 'set_servos _ _ _ _ _ _ _' 'auto auto auto auto auto auto auto' 14 15 0 0 10 '10' '10'
+  spec ' ' 'run_motion' 'run_motion _ _' 'auto auto' 0 30
+  spec ' ' 'change_spot_LED' 'change_spot_LED _ _ _ _' 'auto auto auto auto' 0 0 100 50
+  spec ' ' 'initialize' 'initialize'
+  spec ' ' 'update_LEDpanel' 'set_LEDpanel_color _ _ _ _' 'auto auto auto auto' 0 120 100 60
+  spec 'r' 'adjuct_saturation' 'adjuct_saturation _ _' 'auto auto' 100 100
+  spec 'r' 'myBlock' 'adjust_hue _ _' 'auto auto' '10' '10'
+
+to adjuct_saturation target_saturation current_saturation {
+  local 'delta' 2
+  local 'adusted_saturation' 0
+  if (current_saturation < target_saturation) {
+    adusted_saturation = (current_saturation + delta)
+  } (current_saturation > target_saturation) {
+    adusted_saturation = (current_saturation - delta)
+  } else {
+    adusted_saturation = target_saturation
+  }
+  return adusted_saturation
+}
+
+to change_spot_LED index hue saturation brightness {
+  local 'pic_x' 0
+  local 'pic_y' 0
+  if (and (index < 10) (index > 6)) {
+    pic_x = 1
+  } (and (index < 6) (index > 2)) {
+    pic_x = 8
+  } else {
+    pic_x = 4
+  }
+  if (and (index < 8) (index > 4)) {
+    pic_y = 1
+  } (or (and (index < 4) (index > 1)) (index == 9)) {
+    pic_y = 8
+  } else {
+    pic_y = 4
+  }
+  neoPanel_draw_circle pic_x pic_y 2 ('[misc:hsvColor]' hue saturation brightness)
+}
+
+to initialize {
+  comment 'for LEDs'
+  LED_brightness = LED_default_brigthness
+  LED_hue = LED_hue_orange
+  LED_saturation = 100
+  atPut 'all' LED_spot_hue LED_hue
+  atPut 'all' LED_spot_saturation LED_saturation
+  clearNeoPixels
+  comment 'for servo motors'
+  current_deg1 = ini_deg1
+  current_deg2 = ini_deg2
+  speed = 10
+  setServoAngle Servo1 current_deg1
+  setServoAngle Servo2 current_deg2
+  comment 'for touch sensors'
+  atPut 'all' touched_time 0
+  atPut 'all' touch_length 0
+  atPut 'all' touch_state 0
+  atPut 'all' long_touch_state 0
+  longest_touched_sensor = 0
+  short_touched_sensor = 0
+  long_touch_num = 0
+  last_short_touched_time = 0
+  last_longest_touched_sensor = 0
+  comment 'for mood'
+  comment 'mood: from -100 to 100'
+  mood = 0
+  anger_probability = 0
+  refusal_probability = 0
+  greatjoy_probability = 0
+  dance_probability = 0
+  tilt = 0
+  tilt_direction = 1
+  play_snaggling_sound = 0
+  play_startled_sound = 0
+  play_angry_sound = 0
+  play_refusal_sound = 0
+  play_greatjoy_sound = 0
+  resetTimer
+}
+
+to myBlock target_hue current_hue {
+  local 'delta' 2
+  local 'adusted_hue' 0
+  if (target_hue < 180) {
+    if (or (current_hue < target_hue) ((target_hue + 180) < current_hue)) {
+      adusted_hue = ((current_hue + delta) % 360)
+    } (and (target_hue < current_hue) (current_hue <= (target_hue + 180))) {
+      adusted_hue = (current_hue - delta)
+    } else {
+      adusted_hue = target_hue
+    }
+  } else {
+    if (and (current_hue < target_hue) ((target_hue - 180) < current_hue)) {
+      adusted_hue = (current_hue + delta)
+    } (or (current_hue > target_hue) (current_hue <= (target_hue - 180))) {
+      adusted_hue = (((current_hue - delta) + 360) % 360)
+    } else {
+      adusted_hue = target_hue
+    }
+  }
+  return adusted_hue
+}
+
+to run_LED index {
+  if (index <= 15) {
+    comment 'Turn the LED color'
+    if (index < 7) {
+      LED_hue = ((index - 1) * 16)
+    } else {
+      LED_hue = ((index - 1) * 22)
+    }
+    LED_saturation = 100
+  } (index == 16) {
+    comment 'Turn the LED white'
+    LED_hue = 0
+    LED_saturation = 0
+  } (index == 17) {
+    comment 'Turn up the LED brigthness'
+    if (LED_brightness < 100) {
+      LED_brightness += 5
+    }
+  } (index == 18) {
+    comment 'Turn down the LED brigthness'
+    if (0 < LED_brightness) {
+      LED_brightness += -5
+    }
+  }
+  atPut 'all' LED_spot_hue LED_hue
+  atPut 'all' LED_spot_saturation LED_saturation
+  neoPixelSetAllToColor ('[misc:hsvColor]' LED_hue LED_saturation LED_brightness)
+}
+
+to run_motion index deg {
+  local 'steps' 1
+  local 'step_flow' (newList 10 0)
+  if (index == 10) {
+    comment 'CW motion'
+    steps = 10
+    step_flow = ('[data:makeList]' 2 9 8 7 6 5 4 3 2 1)
+  } (index == 11) {
+    comment 'You can add a original motion here.'
+  } (index == 12) {
+    comment 'CCW motion'
+    steps = 10
+    step_flow = ('[data:makeList]' 2 3 4 5 6 7 8 9 2 1)
+  } (index == 13) {
+    comment 'speed up'
+    if (0 < speed) {
+      speed += -2
+    }
+    steps = 0
+  } (index == 14) {
+    comment 'speed down'
+    if (speed < 20) {
+      speed += 2
+    }
+    steps = 0
+  } (index == 50) {
+    steps = 7
+    step_flow = ('[data:makeList]' 4 8 4 8 4 8 1)
+  }
+  if (0 < steps) {
+    local 'target_deg1' 0
+    local 'target_deg2' 0
+    for i steps {
+      if (or (index == 1) ((at i step_flow) == 1)) {
+        comment 'center'
+        target_deg1 = ini_deg1
+        target_deg2 = ini_deg2
+      } (or (index == 2) ((at i step_flow) == 2)) {
+        comment 'front'
+        target_deg1 = (ini_deg1 + deg)
+        target_deg2 = (ini_deg2 - deg)
+      } (or (index == 3) ((at i step_flow) == 3)) {
+        comment 'front left'
+        target_deg1 = ini_deg1
+        target_deg2 = (ini_deg2 - deg)
+      } (or (index == 4) ((at i step_flow) == 4)) {
+        comment 'left'
+        target_deg1 = (ini_deg1 - deg)
+        target_deg2 = (ini_deg2 - deg)
+      } (or (index == 5) ((at i step_flow) == 5)) {
+        comment 'back left'
+        target_deg1 = (ini_deg1 - deg)
+        target_deg2 = ini_deg2
+      } (or (index == 6) ((at i step_flow) == 6)) {
+        comment 'back'
+        target_deg1 = (ini_deg1 - deg)
+        target_deg2 = (ini_deg2 + deg)
+      } (or (index == 7) ((at i step_flow) == 7)) {
+        comment 'back right'
+        target_deg1 = ini_deg1
+        target_deg2 = (ini_deg2 + deg)
+      } (or (index == 8) ((at i step_flow) == 8)) {
+        comment 'right'
+        target_deg1 = (ini_deg1 + deg)
+        target_deg2 = (ini_deg2 + deg)
+      } (or (index == 9) ((at i step_flow) == 9)) {
+        comment 'front right'
+        target_deg1 = (ini_deg1 + deg)
+        target_deg2 = ini_deg2
+      }
+      set_servos Servo1 Servo2 current_deg1 current_deg2 target_deg1 target_deg2 speed
+      current_deg1 = target_deg1
+      current_deg2 = target_deg2
+    }
+  }
+}
+
+to set_servo servo deg1 deg2 time {
+  comment 'servo: servo pin number, deg1: current position [deg], deg2: target position [deg], time: time for one deg [msec/deg] '
+  if (deg1 < deg2) {
+    for i (deg2 - deg1) {
+      setServoAngle servo (deg1 + i)
+      waitMillis time
+    }
+  } (deg2 < deg1) {
+    for i (deg1 - deg2) {
+      setServoAngle servo (deg1 - i)
+      waitMillis time
+    }
+  }
+}
+
+to set_servos servo1 servo2 from_deg1 from_deg2 to_deg1 to_deg2 time {
+  comment 'servo: servo pin number, from_deg: start position, to_deg: goal position time: time for one deg [msec/deg] '
+  local 'delta_deg1' (to_deg1 - from_deg1)
+  local 'delta_deg2' (to_deg2 - from_deg2)
+  if ((absoluteValue delta_deg2) <= (absoluteValue delta_deg1)) {
+    if (0 < delta_deg1) {
+      for i (absoluteValue delta_deg1) {
+        setServoAngle servo1 (from_deg1 + i)
+        setServoAngle servo2 (from_deg2 + ((i * delta_deg2) / delta_deg1))
+        waitMillis time
+      }
+    } (delta_deg1 < 0) {
+      for i (absoluteValue delta_deg1) {
+        setServoAngle servo1 (from_deg1 - i)
+        setServoAngle servo2 (from_deg2 - ((i * delta_deg2) / delta_deg1))
+        waitMillis time
+      }
+    }
+  } else {
+    if (0 < delta_deg2) {
+      for i (absoluteValue delta_deg2) {
+        setServoAngle servo1 (from_deg1 + ((i * delta_deg1) / delta_deg2))
+        setServoAngle servo2 (from_deg2 + i)
+        waitMillis time
+      }
+    } (delta_deg2 < 0) {
+      for i (absoluteValue delta_deg2) {
+        setServoAngle servo1 (from_deg1 - ((i * delta_deg1) / delta_deg2))
+        setServoAngle servo2 (from_deg2 - i)
+        waitMillis time
+      }
+    }
+  }
+}
+
+to update_LEDpanel spot hue saturation brightness {
+  comment 'set the color for the specified area. spot 0 means all area.
+Note: _NeoPixel_update is needed after this block.'
+  if (spot == 0) {
+    atPut 'all' _np_pixels ('[misc:hsvColor]' hue saturation brightness)
+  } (and (spot > 0) (spot < 10)) {
+    for i (at spot pix_number_size) {
+      atPut (at i (at spot pix_number)) _np_pixels ('[misc:hsvColor]' hue saturation brightness)
+    }
+  }
+}
+
+script 3590 66 {
+whenBroadcastReceived 'playing_sound'
+forever {
+  if (or (mode == 2) (mode == 3)) {
+    if (play_snaggling_sound == 1) {
+      play_snaggling_sound = 0
+      mp3_playTrackUntilDone 1 30
+    }
+    if (play_greatjoy_sound == 1) {
+      play_greatjoy_sound = 0
+      mp3_playTrackUntilDone 2 30
+    }
+    if (play_refusal_sound == 1) {
+      play_refusal_sound = 0
+      mp3_playTrackUntilDone 3 30
+    }
+    if (play_startled_sound == 1) {
+      play_startled_sound = 0
+      mp3_playTrackUntilDone 4 30
+    }
+    if (play_angry_sound == 1) {
+      play_angry_sound = 0
+      mp3_playTrackUntilDone 5 30
+    }
+  }
+}
+}
+
+script 2977 74 {
+whenBroadcastReceived 'showing_LEDs'
+local 'updated_hue' 0
+local 'updated_saturation' 0
+local 'current_hue' 0
+local 'current_saturation' 0
+local 'update_needed' 0
+forever {
+  if (or (mode == 2) (mode == 3)) {
+    if (mode == 3) {LED_hue = (LED_hue_neutral - ((140 * mood) / 100))}
+    update_needed = 0
+    for i 9 {
+      current_hue = (at i LED_spot_hue)
+      current_saturation = (at i LED_spot_saturation)
+      if ((at i long_touch_state) == 1) {
+        comment 'When touched, turn the touched area orange color (hue:40, saturation:100).'
+        if (LED_saturation == 100) {
+          comment 'when the base color isn''t white'
+          if (current_hue != 40) {
+            updated_hue = (myBlock 40 current_hue)
+            updated_saturation = 100
+            update_needed = 1
+          } else {
+            updated_hue = 40
+            updated_saturation = LED_saturation
+          }
+        } (LED_saturation == 0) {
+          comment 'when the base color is white'
+          if (current_saturation != 100) {
+            updated_hue = 40
+            updated_saturation = (adjuct_saturation 100 current_saturation)
+            update_needed = 1
+          } else {
+            updated_hue = 40
+            updated_saturation = 100
+          }
+        }
+      } else {
+        comment 'When not touched, turn back the touched area base color.'
+        if (LED_saturation == 100) {
+          comment 'when the base color isn''t white'
+          if (current_hue != LED_hue) {
+            updated_hue = (myBlock LED_hue current_hue)
+            updated_saturation = 100
+            update_needed = 1
+          } else {
+            updated_hue = LED_hue
+            updated_saturation = LED_saturation
+          }
+        } (LED_saturation == 0) {
+          comment 'when the base color is white'
+          if (current_saturation != LED_saturation) {
+            updated_hue = 0
+            updated_saturation = (adjuct_saturation LED_saturation current_saturation)
+            update_needed = 1
+          } else {
+            updated_hue = LED_hue
+            updated_saturation = LED_saturation
+          }
+        }
+      }
+      update_LEDpanel i updated_hue updated_saturation LED_brightness
+      atPut i LED_spot_hue updated_hue
+      atPut i LED_spot_saturation updated_saturation
+    }
+    if (update_needed == 1) {
+      '_NeoPixel_update'
+    }
+    waitMillis 35
+  }
+}
+}
+
+script 4073 74 {
+whenBroadcastReceived 'update_mood'
+local 'previous_change_tilt_time' 0
+forever {
+  if (mode == 3) {
+    if (mood >= 0) {
+      comment 'The mood stabilizes depending on time.  '
+      if (mood != 0) {
+        mood += -1
+      }
+      comment 'greatjoy_probality: 0 to 10. '
+      greatjoy_probability = ((mood * mood) / 1000)
+      comment 'reset the parameters related to the negative mood '
+      tilt = 0
+      tilt_direction = 1
+      anger_probability = 0
+      refusal_probability = 0
+      comment 'dance_probality: 0 to 15. '
+      if ((absoluteValue mood) > 70) {
+        dance_probability = (((absoluteValue mood) - 70) / 2)
+      } else {
+        dance_probability = 0
+      }
+    } (mood < 0) {
+      comment 'The mood stabilizes depending on time.  '
+      mood += 1
+      comment 'anger_probability: 0 to 100, refusal_probability: 0 to 50'
+      anger_probability = ((mood * mood) / 100)
+      refusal_probability = ((mood * mood) / 200)
+      if (mood < -50) {
+        comment 'The defalut posture leans when the mood is under -50.'
+        if (((secsOp) - previous_change_tilt_time) > ((absoluteValue mood) / 50)) {
+          tilt = ((((absoluteValue mood) - 50) * max_deg) / 50)
+          tilt_direction = (random 2 9)
+          previous_change_tilt_time = (secsOp)
+        }
+      } else {
+        tilt = 0
+        tilt_direction = 1
+      }
+    }
+    waitMillis 3000
+  }
+}
+}
+
+script 717 85 {
+whenCondition (ir_code_received)
+local 'recieved_IR_code' (ir_last_code)
+local 'idx' ('[data:find]' recieved_IR_code IR_code_mode)
+if (idx > 0) {
+  initialize
+  if (idx == 1) {
+    if (mode == 0) {
+      comment 'Mode 1 starts whenever the switch button tunrs on.'
+      mode = 1
+      neoPixelSetAllToColor ('[misc:hsvColor]' LED_hue LED_saturation LED_brightness)
+    } else {
+      comment 'switch off'
+      mode = 0
+      clearNeoPixels
+    }
+  } (and (idx == 2) (mode != 0)) {
+    comment 'change the modes 1 to 3'
+    mode = ((mode % 3) + 1)
+    if (mode == 2) {
+      comment 'set blue color'
+      LED_hue = LED_hue_blue
+      atPut 'all' LED_spot_hue LED_hue
+    } (mode == 3) {
+      comment 'set neutral color'
+      LED_hue = LED_hue_neutral
+      atPut 'all' LED_spot_hue LED_hue
+    }
+    neoPixelSetAllToColor ('[misc:hsvColor]' LED_hue LED_saturation LED_brightness)
+  }
+} else {
+  idx = ('[data:find]' recieved_IR_code IR_code_LED)
+  if (idx > 0) {
+    if (idx > 16) {
+      comment 'change brightness'
+      run_LED idx
+    } else {
+      if (or (mode == 1) (mode == 2)) {
+        comment 'control LEDs'
+        run_LED idx
+      }
+    }
+  } else {
+    if (mode == 1) {
+      idx = ('[data:find]' recieved_IR_code IR_code_motion)
+      if (idx > 0) {
+        comment 'control motors'
+        run_motion idx max_deg
+      }
+    }
+  }
+}
+sayIt 'IR code:' recieved_IR_code ', mode:' mode
+}
+
+script 2350 89 {
+whenBroadcastReceived 'controlling_motion'
+comment 'drive motors based on sensors'
+forever {
+  if (or (mode == 2) (mode == 3)) {if (longest_touched_sensor > 0) {
+    if (longest_touched_sensor != last_longest_touched_sensor) {
+      if ((random 1 100) <= refusal_probability) {
+        comment 'refusal motion (move to the opposite to the longest touched direction)'
+        play_refusal_sound = 1
+        speed = 10
+        waitMillis 500
+        if (longest_touched_sensor == 1) {
+          run_motion 6 max_deg
+        } else {
+          run_motion ((((longest_touched_sensor - 1) + 4) % 8) + 1) max_deg
+        }
+        waitMillis 2000
+      } ((random 1 100) <= greatjoy_probability) {
+        play_greatjoy_sound = 1
+        waitMillis 1000
+      } else {
+        comment 'snaggling up motion (move to the longest touched direction)'
+        play_snaggling_sound = 1
+        speed = 40
+        waitMillis 200
+        if (longest_touched_sensor == 1) {
+          run_motion 2 max_deg
+        } else {
+          run_motion longest_touched_sensor max_deg
+        }
+      }
+      last_longest_touched_sensor = longest_touched_sensor
+    }
+    comment 'Disable short touch when long touched'
+    short_touched_sensor = 0
+  } else {
+    last_longest_touched_sensor = 0
+    if (short_touched_sensor > 0) {
+      speed = 0
+      if ((random 1 100) <= anger_probability) {
+        comment 'angry motion'
+        play_angry_sound = 1
+        waitMillis 500
+        if (short_touched_sensor == 1) {
+          run_motion 6 10
+          waitMillis 300
+          run_motion 2 15
+        } else {
+          run_motion ((((short_touched_sensor - 1) + 4) % 8) + 1) 10
+          waitMillis 300
+          run_motion short_touched_sensor 15
+        }
+      } else {
+        comment 'startled motion'
+        play_startled_sound = 1
+        waitMillis 300
+        if (short_touched_sensor == 1) {
+          run_motion 6 10
+        } else {
+          run_motion ((((short_touched_sensor - 1) + 4) % 8) + 1) 10
+        }
+      }
+      short_touched_sensor = 0
+    } else {
+      comment 'move to initial position'
+      if ((random 1 500) < dance_probability) {
+        if (mood > 0) {
+          play_greatjoy_sound = 1
+          speed = 10
+          run_motion 50 max_deg
+          dance_probability = 0
+        }
+      } else {
+        speed = 40
+        run_motion tilt_direction tilt
+        waitMillis 300
+      }
+    }
+  }}
+}
+}
+
+script 1812 92 {
+whenBroadcastReceived 'monitoring_sensors'
+comment 'Monitoring touch sensors in mode 2 or 3'
+local 'last_long_touched_time' 0
+forever {
+  if (or (mode == 2) (mode == 3)) {
+    long_touch_num = 0
+    for i 9 {
+      if ((at i touch_state) == 1) {
+        atPut i touch_length ((millisOp) - (at i touched_time))
+        if ((at i touch_length) > 500) {
+          atPut i long_touch_state 1
+          comment 'count long touched sensors'
+          long_touch_num += 1
+          comment 'search the longest touched sensor'
+          if (i > 1) {
+            if ((at (i - 1) touch_length) < (at i touch_length)) {longest_touched_sensor = i}
+          } else {
+            longest_touched_sensor = 1
+          }
+        }
+      }
+    }
+    if (long_touch_num == 0) {
+      longest_touched_sensor = 0
+    } else {
+      if (mode == 3) {
+        comment 'A long touch makes the mood positive'
+        if (((millisOp) - last_long_touched_time) > 500) {
+          if (long_touch_num > 2) {
+            if (mood < 99) {
+              mood += 2
+            } else {
+              mood = 100
+            }
+          } else {
+            if (mood < 100) {mood += 1}
+          }
+          last_long_touched_time = (millisOp)
+        }
+      }
+    }
+    sayIt (at 1 touch_length) (at 2 touch_length) (at 3 touch_length) (at 4 touch_length) (at 5 touch_length) (at 6 touch_length) (at 7 touch_length) (at 9 touch_length) (at 8 touch_length) ',' 'mood:' mood ',' 'probability:' anger_probability refusal_probability greatjoy_probability dance_probability
+  }
+}
+}
+
+script 1244 93 {
+whenCondition (touch_touch_event)
+if (or (mode == 2) (mode == 3)) {
+  for i 9 {
+    if ((touch_last_touched_pin) == i) {
+      atPut i touch_state 1
+      atPut i touched_time (millisOp)
+    }
+  }
+}
+}
+
+script 66 98 {
+whenStarted
+makerport_initialize
+comment 'IR controller settings'
+attachIR 22
+comment '88: red to 26: pink, 68: white, 92: turn up brightness, 93: turn down brigthness'
+IR_code_LED = ('[data:makeList]' 88 84 80 28 24 89 85 81 29 25 69 73 77 30 26 68 92 93)
+comment '17: center, 13: front, 14: front left, 18: left, 22:back left,  21: back, 20: back right, 16 right,
+12: front right, 8: CW motion, 9: -, 10:CCW motion, 23: speed up, 19: speed down'
+IR_code_motion = ('[data:makeList]' 17 13 14 18 22 21 20 16 12 8 9 10 23 19)
+comment '64: swith on/off, 65: swith modes'
+IR_code_mode = ('[data:makeList]' 64 65)
+comment 'mode 0: off, 1: IR remote control mode, 2: semi-interactive mode, 3: full interactive mode '
+mode = 0
+comment '8x8 LED matrix settings'
+LEDpanel = 16
+neoPanel_attach 8 8 LEDpanel
+LED_spot_hue = (newList 9)
+LED_spot_saturation = (newList 9)
+pix_number = ('[data:makeList]' ('[data:makeList]' 20 21 27 28 29 30 35 36 37 38 44 45) ('[data:makeList]' 24 25 26 39 40 41) ('[data:makeList]' 42 43 54 55 56 57 58) ('[data:makeList]' 52 53 59 60 61 62) ('[data:makeList]' 46 47 49 50 51 63 64) ('[data:makeList]' 17 31 32 33 34 48) ('[data:makeList]' 1 2 14 15 16 18 19) ('[data:makeList]' 3 4 5 6 12 13) ('[data:makeList]' 7 8 9 10 11 22 23))
+pix_number_size = (newList 9)
+for i 9 {
+  atPut i pix_number_size (size (at i pix_number))
+}
+LED_hue_neutral = 140
+LED_hue_orange = 48
+LED_hue_blue = 220
+LED_default_brigthness = 70
+comment 'Servo settings'
+Servo1 = 14
+Servo2 = 15
+ini_deg1 = 0
+ini_deg2 = 0
+max_deg = 30
+comment 'Touch sensors settings'
+touched_time = (newList 9)
+touch_length = (newList 9)
+touch_state = (newList 9)
+long_touch_state = (newList 9)
+comment 'set mp3 settings'
+mp3_setVolume 30
+initialize
+sendBroadcast 'monitoring_sensors'
+sendBroadcast 'controlling_motion'
+sendBroadcast 'showing_LEDs'
+sendBroadcast 'playing_sound'
+sendBroadcast 'update_mood'
+}
+
+script 1245 462 {
+whenCondition (touch_release_event)
+if (or (mode == 2) (mode == 3)) {
+  for i 9 {
+    if ((touch_last_released_pin) == i) {
+      atPut i touch_length ((millisOp) - (at i touched_time))
+      if ((at i touch_length) < 120) {
+        comment 'detect short touch'
+        short_touched_sensor = i
+        if (mode == 3) {
+          comment 'A short touch makes the mood negative.'
+          if (((millisOp) - last_short_touched_time) < 2000) {
+            if (-98 < mood) {
+              mood += -3
+            } else {
+              mood = -100
+            }
+          } else {
+            if (-100 < mood) {mood += -1}
+          }
+          last_short_touched_time = (millisOp)
+        }
+      }
+      atPut i touch_state 0
+      atPut i long_touch_state 0
+      atPut i touch_length 0
+    }
+  }
+}
+}
+
+script 69 2165 {
+to initialize {}
+}
+
+
+module BMP Output
+author 'José García Yeste'
+version 2 10 
+depends _TFT _Files 
+description 'Display BMP files on a TFT screen.
+
+BMP files can be transferred to and from boards with a file systems using the put/get commands in the IDE file menu (available in "show advanced blocks" mode).
+
+Dragging a BMP file over microBlocks also loads the file into the file system.
+
+This library works with uncompressed BMP files with 1, 4, 8, 16, 24 and 32 bits per pixel. v2.0 supports 4 and 8 bit RLE compressed files.
+
+Tested with GIMP, online-convert.com and convert.io generated files.
+
+'
+variables _bmpPalette _bmpIsRGB565 _bmpPixelsOffset _bmpWidth _bmpHeight _bmpBPP _bmpCompression _bmpLine _bmpPixelLine 
+
+  spec ' ' 'drawBMPfile' 'display BMP file _ at x _ y _' 'str num num' 'image.bmp' 0 0
+  space
+  spec 'r' '_bmp_readHeader' '_bmp_readHeader file _' 'str' ''
+  spec ' ' '_bmp_drawBMP' '_bmp_drawBMP file _ x _ y _' 'str num num' '' 0 0
+  spec ' ' '_bmp_drawBMPPixels' '_bmp_drawBMPPixels file _ x _ y _ with function _' 'str num num str' '' 0 0 '[tft:setPixel]'
+  space
+  spec ' ' '_bmp_readPalette' '_bmp_readPalette file _' 'auto' ''
+  spec 'r' '_bmp_readPixelLine' '_bmp_readPixelLine file _' 'str' ''
+  spec ' ' '_bmp_readLine' '_bmp_readLine file _' 'auto' ''
+  spec 'r' '_bmp_readRLEline' '_bmp_readRLELine file _' 'auto' ''
+  spec ' ' '_bmp_mapIndexedPixels' '_bmp_mapIndexedPixels'
+  space
+  spec 'r' '_bmp_readRGBPixelLine' '_bmp_readRGBPixelLine file _' 'auto' ''
+  spec 'r' '_bmp_16BitPixel' '_bmp_16BitPixel from _ starting at _' 'str num' '' 1
+  spec 'r' '_bmp_24BitPixel' '_bmp_24BitPixel from _ starting at _' 'str num' '' 1
+  space
+  spec ' ' '_bmp_alignLineData' '_bmp_alignLineData file _' 'auto' ''
+  spec 'r' '_bmp_readInt16' '_bmp read int16 file _' 'str' ''
+  spec 'r' '_bmp_readInt32' '_bmp read int32 file _' 'str' ''
+
+to '_bmp_16BitPixel' data i {
+  local 'pixel' (((at (i + 1) data) << 8) | (at i data))
+  if _bmpIsRGB565 {
+    local 'r' ((pixel >> 8) & 248)
+    local 'g' ((pixel >> 3) & 248)
+  } else {
+    local 'r' ((pixel >> 7) & 248)
+    local 'g' ((pixel >> 2) & 248)
+  }
+  local 'b' ((pixel & 31) << 3)
+  return ((r << 16) | ((g << 8) | b))
+}
+
+to '_bmp_24BitPixel' data i {
+  return ((((at (i + 2) data) << 16) | ((at (i + 1) data) << 8)) | (at i data))
+}
+
+to '_bmp_alignLineData' filename {
+  if (and (_bmpCompression != 1) (_bmpCompression != 2)) {
+    local 'padding' (((32 - ((_bmpWidth * _bmpBPP) % 32)) / 8) % 4)
+    if (padding > 0) {
+      file_SkipBytes padding filename
+    }
+  }
+}
+
+to '_bmp_drawBMP' filename originX originY {
+  '[file:setReadPosition]' _bmpPixelsOffset filename
+  if (_bmpHeight >= 0) {
+    local 'y' ((originY + _bmpHeight) - 1)
+    local 'yIncrement' -1
+  } else {
+    local 'y' originY
+    local 'yIncrement' 1
+  }
+  local 'bytesPerPixel' (_bmpBPP / 8)
+  if (not _bmpIsRGB565) {
+    bytesPerPixel = (0 - bytesPerPixel)
+  }
+  repeat (absoluteValue _bmpHeight) {
+    local 'line' ('_bmp_readPixelLine' filename)
+    '[tft:pixelRow]' line originX y bytesPerPixel _bmpPalette
+    y += yIncrement
+  }
+}
+
+to '_bmp_drawBMPPixels' filename originX originY setPixelFunction {
+  comment 'Much slower than _bmp_drawBMP but allows client to supply
+a setPixelFunction, so it can be used to draw a BMP file
+file onto other devices such as a NeoPixel panel.'
+  '[file:setReadPosition]' _bmpPixelsOffset filename
+  if (_bmpHeight >= 0) {
+    local 'y' ((originY + _bmpHeight) - 1)
+    local 'yIncrement' -1
+  } else {
+    local 'y' originY
+    local 'yIncrement' 1
+  }
+  local 'parameters' (newList 3)
+  repeat (absoluteValue _bmpHeight) {
+    local 'line' ('_bmp_readRGBPixelLine' filename)
+    for x (size line) {
+      atPut 1 parameters (originX + (x - 1))
+      atPut 2 parameters y
+      atPut 3 parameters (at x line)
+      callCustomCommand setPixelFunction parameters
+    }
+    y += yIncrement
+  }
+}
+
+to '_bmp_mapIndexedPixels' {
+  local 'mask' ((1 << _bmpBPP) - 1)
+  local 'pixelsPerByte' (8 / _bmpBPP)
+  local 'i' 1
+  for byte _bmpLine {
+    local 'shift' (8 - _bmpBPP)
+    repeat pixelsPerByte {
+      if (i <= _bmpWidth) {
+        local 'pixelIndex' (((byte >> shift) & mask) + 1)
+        atPut i _bmpPixelLine (at pixelIndex _bmpPalette)
+        shift = (shift - _bmpBPP)
+        i += 1
+      }
+    }
+  }
+  return _bmpPixelLine
+}
+
+to '_bmp_readHeader' filename {
+  local 'fileSize' ('[file:fileSize]' filename)
+  if (fileSize < 0) {
+    sayIt 'File not found: ' filename
+    return 'false'
+  }
+  '[file:open]' filename
+  if (or (fileSize < 54) ('BM' != ('[data:join]' '' ('[file:readBytes]' 2 filename)))) {
+    sayIt 'Not a BMP file: ' filename
+    return false
+  }
+  file_SkipBytes 8 filename
+  _bmpPixelsOffset = ('_bmp_readInt32' filename)
+  local 'headerSize' ('_bmp_readInt32' filename)
+  _bmpWidth = ('_bmp_readInt32' filename)
+  _bmpHeight = ('_bmp_readInt32' filename)
+  _bmpPixelLine = (newList _bmpWidth)
+  file_SkipBytes 2 filename
+  _bmpBPP = ('_bmp_readInt16' filename)
+  _bmpCompression = ('_bmp_readInt32' filename)
+  if (_bmpCompression > 3) {
+    sayIt ('[data:join]' 'Unsupported compression method: ' _bmpCompression)
+    return false
+  }
+  _bmpPalette = 0
+  if (_bmpBPP <= 8) {
+    file_SkipBytes 12 filename
+    local 'palSize' ('_bmp_readInt16' filename)
+    if (palSize == 0) {
+      palSize = (1 << _bmpBPP)
+    }
+    _bmpPalette = (newList palSize)
+    file_SkipBytes (headerSize - 34) filename
+    '_bmp_readPalette' filename
+  } else {
+    _bmpIsRGB565 = (booleanConstant false)
+    if (_bmpCompression == 3) {
+      file_SkipBytes 20 filename
+      comment 'BITFIELD  Red'
+      _bmpIsRGB565 = (('_bmp_readInt32' filename) == (hexToInt 'F800'))
+    }
+  }
+  return true
+}
+
+to '_bmp_readInt16' filename {
+  local 'data' ('[file:readBytes]' 2 filename)
+  return (((at 2 data) << 8) | (at 1 data))
+}
+
+to '_bmp_readInt32' filename {
+  local 'data' ('[file:readBytes]' 4 filename)
+  return ((((at 4 data) << 24) | ((at 3 data) << 16)) | (((at 2 data) << 8) | (at 1 data)))
+}
+
+to '_bmp_readLine' filename {
+  if (or (_bmpCompression == 1) (_bmpCompression == 2)) {
+    _bmpLine = ('_bmp_readRLEline' filename)
+  } else {
+    local 'byteCount' (((_bmpWidth * _bmpBPP) + 7) / 8)
+    if ((size _bmpLine) == byteCount) {
+      comment 'Reuse existing line buffer if possible'
+      local 'bytesRead' ('[file:readInto]' _bmpLine filename)
+    } else {
+      _bmpLine = ('[file:readBytes]' byteCount filename)
+      repeatUntil ((size _bmpLine) >= byteCount) {
+        _bmpLine = ('[data:join]' _bmpLine ('[file:readBytes]' (byteCount - (size _bmpLine)) filename))
+      }
+    }
+  }
+}
+
+to '_bmp_readPalette' filename {
+  local 'pal' ('[file:readBytes]' (4 * (size _bmpPalette)) filename)
+  repeatUntil ((size pal) >= (4 * (size _bmpPalette))) {
+    pal = ('[data:join]' pal ('[file:readBytes]' ((4 * (size _bmpPalette)) - (size pal)) filename))
+  }
+  for i (size _bmpPalette) {
+    atPut i _bmpPalette (((at ((i * 4) - 1) pal) << 16) | (((at ((i * 4) - 2) pal) << 8) | (at ((i * 4) - 3) pal)))
+  }
+}
+
+to '_bmp_readPixelLine' filename {
+  '_bmp_readLine' filename
+  '_bmp_alignLineData' filename
+  return (ifExpression (_bmpBPP < 8) ('_bmp_mapIndexedPixels') _bmpLine)
+}
+
+to '_bmp_readRGBPixelLine' filename {
+  local 'result' ('[data:makeList]')
+  '_bmp_readLine' filename
+  if (_bmpBPP <= 8) {
+    for i _bmpLine {
+      '[data:addLast]' (at (i + 1) _bmpPalette) result
+    }
+  } else {
+    local 'i' 1
+    repeatUntil ((size result) == _bmpWidth) {
+      if (_bmpBPP == 16) {
+        '[data:addLast]' ('_bmp_16BitPixel' _bmpLine i) result
+      } else {
+        '[data:addLast]' ('_bmp_24BitPixel' _bmpLine i) result
+      }
+      i += (maximum (_bmpBPP / 8) 1)
+    }
+  }
+  '_bmp_alignLineData' filename
+  return result
+}
+
+to '_bmp_readRLEline' filename {
+  local 'result' ('[data:newByteArray]' 0)
+  forever {
+    if ((('[file:readPosition]' filename) & 1) == 1) {file_SkipBytes 1 filename}
+    local 'rle' ('[file:readBytes]' 2 filename)
+    if ((size rle) == 0) {
+      return result
+    }
+    if ((at 1 rle) == 0) {
+      if ((at 2 rle) > 2) {
+        comment 'odd numbers for RL4?'
+        result = ('[data:join]' result ('[file:readBytes]' ((((at 2 rle) * _bmpBPP) + 7) / 8) filename))
+      } else {
+        return result
+      }
+    } else {
+      result = ('[data:join]' result ('[data:newByteArray]' ((((at 1 rle) * _bmpBPP) + 7) / 8) (at 2 rle)))
+    }
+  }
+}
+
+to drawBMPfile filename originX originY {
+  if ('_bmp_readHeader' filename) {
+    '_bmp_drawBMP' filename originX originY
+    '[file:close]' filename
+  }
+}
+
+
+module Color Operators
+author MicroBlocks
+version 1 1 
+description 'Support for color operations, Work with color hue, saturation, and brightness (HSV).'
+
+  spec 'r' 'color_colorSwatch' '_' 'color'
+  spec 'r' 'color_RGB' 'color r _ g _ b _ (0-255)' 'num num num' 0 100 100
+  spec 'r' 'color_gray' 'gray _ %' 'num' 50
+  spec 'r' 'color_random' 'random color'
+  space
+  spec 'r' 'color_red' 'red _' 'color'
+  spec 'r' 'color_green' 'green _' 'color'
+  spec 'r' 'color_blue' 'blue _' 'color'
+  space
+  spec 'r' '[misc:hsvColor]' 'color hue _ (0-360) saturation _ % brightness _ %' 'num num num' 0 90 100
+  spec 'r' '[misc:hue]' 'hue _' 'color'
+  spec 'r' '[misc:saturation]' 'saturation _' 'color'
+  spec 'r' '[misc:brightness]' 'brightness _' 'color'
+  space
+  spec 'r' 'color_withHue' '_ with hue _ (0-360)' 'color num' nil 60
+  spec 'r' 'color_withSaturation' '_ with saturation _ %' 'color num' nil 100
+  spec 'r' 'color_withBrightness' '_ with brightness _ %' 'color num' nil 100
+
+to color_RGB r g b {
+  r = (maximum 0 (minimum r 255))
+  g = (maximum 0 (minimum g 255))
+  b = (maximum 0 (minimum b 255))
+  return ((r << 16) | ((g << 8) | b))
+}
+
+to color_blue color {
+  return (color & 255)
+}
+
+to color_colorSwatch color {
+  return color
+}
+
+to color_gray percent {
+  gray = ((percent * 255) / 100)
+  gray = (maximum 0 (minimum gray 255))
+  return ((gray << 16) | ((gray << 8) | gray))
+}
+
+to color_green color {
+  return ((color >> 8) & 255)
+}
+
+to color_random {
+  local 'n1' (random 100 200)
+  local 'n2' (random 0 100)
+  if (1 == (random 1 3)) {
+    return ((n1 << 16) | (n2 << 8))
+  } (1 == (random 1 2)) {
+    return ((n2 << 16) | n1)
+  } else {
+    return ((n1 << 8) | n2)
+  }
+}
+
+to color_red color {
+  return ((color >> 16) & 255)
+}
+
+to color_withBrightness color brightness {
+  return ('[misc:hsvColor]' ('[misc:hue]' color) ('[misc:saturation]' color) brightness)
+}
+
+to color_withHue color hue {
+  return ('[misc:hsvColor]' hue ('[misc:saturation]' color) ('[misc:brightness]' color))
+}
+
+to color_withSaturation color saturation {
+  return ('[misc:hsvColor]' ('[misc:hue]' color) saturation ('[misc:brightness]' color))
+}
+
+
+module Files Data
+author MicroBlocks
+version 1 4 
+description 'Flash file system operations. Currently supports the LittleFS file system on ESP8266 and ESP32 boards. The GnuBlocks virtual machine (Linux and Raspberry Pi) supports the native system.'
+
+  spec ' ' '[file:open]' 'open file _' 'str'
+  spec ' ' '[file:close]' 'close file _' 'str'
+  spec ' ' '[file:delete]' 'delete file _' 'str'
+  space
+  spec ' ' '[file:appendLine]' 'append line _ to file _' 'str str'
+  spec ' ' '[file:appendBytes]' 'append bytes _ to file _' 'str str'
+  space
+  spec 'r' '[file:fileSize]' 'size of file _' 'str'
+  spec 'r' 'file_contents' 'contents of file _ : binary _' 'str bool' '' false
+  space
+  spec 'r' '[file:readLine]' 'next line of file _' 'str'
+  spec 'r' '[file:readBytes]' 'next _ bytes of file _ : starting at _' 'num str num' 100 '' 0
+  spec 'r' '[file:readInto]' 'read into _ from file _' 'str str' 'a ByteArray' ''
+  spec 'r' '[file:endOfFile]' 'end of file _' 'str'
+  space
+  spec 'r' '[file:readPosition]' 'read position of file _' 'str'
+  spec ' ' '[file:setReadPosition]' 'set read position _ of file _' 'num str' 0 ''
+  spec ' ' 'file_SkipBytes' 'skip _ bytes of file _' 'num str' 4 ''
+  space
+  spec 'r' 'file names' 'file names : in directory _' 'str'
+  spec 'r' '[file:systemInfo]' 'file system info'
+
+to 'file names' dir {
+  '[file:startList]' dir
+  local 'result' ('[data:makeList]')
+  local 'fileName' ('[file:nextInList]')
+  repeatUntil (fileName == '') {
+    '[data:addLast]' fileName result
+    fileName = ('[file:nextInList]')
+  }
+  return result
+}
+
+to file_SkipBytes offset file {
+  local 'newPosition' (('[file:readPosition]' file) + offset)
+  '[file:setReadPosition]' newPosition file
+}
+
+to file_contents fileName optionBinary {
+  local 'binary' (argOrDefault 2 (booleanConstant false))
+  local 'byteCount' ('[file:fileSize]' fileName)
+  local 'result' ('[data:newByteArray]' byteCount)
+  local 'i' 1
+  '[file:open]' fileName
+  repeatUntil (i > byteCount) {
+    i += ('[file:readInto]' result fileName)
+  }
+  '[file:close]' fileName
+  return (ifExpression binary result ('[data:convertType]' result 'string'))
+}
+
+
+module 'IR Remote' Comm
+author MicroBlocks
+version 1 9 
+tags ir infrared remote 
+description 'Sends and receives infrared remote control messages like the ones used for TV sets or air conditioners. Currently supports only the NEC protocol, which is quite common but not the only IR protocol in use. An NEC message consists of a one byte device number and a one byte command.
+
+Note: Transmitting IR does not work on ESP8266 boards.
+
+Receiving requires an IR receiver module, such as those built into the Circuit Playground Express and ED1 boards. Transmitting requires an IR transmitter LED, such as those built into the Circuit Playground Express and several M5 Stack products. Inexpensive IR LED transmitter and receivers are available for use with other boards.
+'
+variables _ir_pin _ir_pulse_times _ir_last_code _ir_last_device _ir_transmit_pin 
+
+  spec ' ' 'attachIR' 'attach IR receiver to pin _' 'num' 0
+  spec 'r' 'ir_code_received' 'IR code received?'
+  spec 'r' 'ir_last_code' 'IR code'
+  space
+  spec ' ' 'IR_Transmit' 'IR transmit device _ command _' 'num num' 48896 1
+  spec ' ' 'attachIRTransmitter' 'attach IR transmitter to pin _' 'num' 0
+  space
+  spec 'r' 'receiveIR' 'receive IR code'
+  space
+  spec ' ' '_testIR' '_test IR'
+  spec 'r' '_receiveIRFromDevice' '_receive IR code from device _' 'num' 48896
+  space
+  spec ' ' '_captureIRMessage' '_captureIRMessage' 'any'
+  spec ' ' '_dumpIR' '_dumpIR' 'any'
+  spec 'r' '_getIRByte' '_getIRByte _' 'auto any' 4
+  spec 'r' '_got32Bits' '_got32Bits' 'any'
+  spec ' ' '_IR_SendByte' '_IR_SendByte _' 'auto' '10'
+  spec ' ' 'timerIRCapture' 'timerIRCapture'
+  spec ' ' 'interruptIRCapture' 'interruptIRCapture'
+
+to IR_Transmit device command {
+  if (_ir_transmit_pin == 0) {if (or ((boardType) == 'CircuitPlayground') ((boardType) == 'M5Atom-Matrix')) {
+    _ir_transmit_pin = 12
+  } (or ((boardType) == 'M5StickC') ((boardType) == 'M5StickC+')) {
+    _ir_transmit_pin = 9
+  }}
+  comment 'Message start pulse and space'
+  '[io:playTone]' _ir_transmit_pin 38000
+  waitMicros 9000
+  '[io:playTone]' _ir_transmit_pin 0
+  waitMicros 4500
+  comment 'Send device and command and their inverses'
+  '_IR_SendByte' (device & 255)
+  '_IR_SendByte' ((device >> 8) & 255)
+  '_IR_SendByte' command
+  '_IR_SendByte' ('~' command)
+  comment 'Send stop bit'
+  '[io:playTone]' _ir_transmit_pin 38000
+  waitMicros 562
+  '[io:playTone]' _ir_transmit_pin 0
+  comment 'Turn off IR transmit LED'
+  if (or ((boardType) == 'M5StickC') ((boardType) == 'M5StickC+')) {
+    comment 'IR pin is inverted so true means "off"'
+    digitalWriteOp _ir_transmit_pin true
+  } else {
+    digitalWriteOp _ir_transmit_pin false
+  }
+}
+
+to '_IR_SendByte' byte {
+  local 'bit' 1
+  repeat 8 {
+    if (0 == (byte & bit)) {
+      '[io:playTone]' _ir_transmit_pin 38000
+      waitMicros 530
+      '[io:playTone]' _ir_transmit_pin 0
+      waitMicros 530
+    } else {
+      '[io:playTone]' _ir_transmit_pin 38000
+      waitMicros 530
+      '[io:playTone]' _ir_transmit_pin 0
+      waitMicros 1630
+    }
+    bit = (bit << 1)
+  }
+}
+
+to '_captureIRMessage' {
+  if (_ir_pulse_times == 0) {
+    _ir_pulse_times = (newList 100)
+    if (_ir_pin == 0) {
+      if ((boardType) == 'CircuitPlayground') {
+        _ir_pin = 11
+      } ((boardType) == 'Citilab ED1') {
+        _ir_pin = 35
+      } ((boardType) == 'D1-Mini') {
+        _ir_pin = 2
+      } ((boardType) == 'MakerPort') {
+        _ir_pin = 18
+      } ((boardType) == 'MakerPort V3') {
+        _ir_pin = 22
+      }
+    }
+  }
+  comment 'Capture the next IR message.'
+  if (or ((boardType) == 'micro:bit v2') ((boardType) == 'Calliope v3')) {
+    timerIRCapture
+  } else {
+    interruptIRCapture
+  }
+}
+
+to '_dumpIR' {
+  comment 'Print raw pulse timings to the terminal.
+Can be used to analyze new protocols.'
+  local 'i' 1
+  graphIt '-----'
+  repeat (size _ir_pulse_times) {
+    local 'mark usecs' (at i _ir_pulse_times)
+    local 'space usecs' (at (i + 1) _ir_pulse_times)
+    graphIt (v 'mark usecs') (v 'space usecs')
+    i += 2
+    if ((v 'space usecs') == 0) {
+      graphIt 'timing entries:' (i - 2)
+      return 0
+    }
+  }
+}
+
+to '_getIRByte' position {
+  local 'result' 0
+  local 'i' position
+  local 'bit' 1
+  repeat 8 {
+    if ((at i _ir_pulse_times) > 1000) {result = (result | bit)}
+    bit = (bit << 1)
+    i += 2
+  }
+  return result
+}
+
+to '_got32Bits' {
+  return (and ((at 67 _ir_pulse_times) != 0) ((at 68 _ir_pulse_times) == 0))
+}
+
+to '_receiveIRFromDevice' deviceID {
+  forever {
+    '_captureIRMessage'
+    if ('_got32Bits') {
+      local 'id_lowByte' ('_getIRByte' 4 nil)
+      local 'id_highByte' ('_getIRByte' 20 nil)
+      if (and (id_highByte == (deviceID >> 8)) (id_lowByte == (deviceID & 255))) {
+        return ('_getIRByte' 36 nil)
+      }
+    }
+  }
+}
+
+to '_testIR' {
+  forever {
+    '_captureIRMessage'
+    if ('_got32Bits') {
+      comment 'Four byte message format:
+<device low byte><device high byte><command><command, bit-inverted>'
+      local 'b1' ('_getIRByte' 4 nil)
+      local 'b2' ('_getIRByte' 20 nil)
+      local 'b3' ('_getIRByte' 36 nil)
+      local 'b4' ('_getIRByte' 52 nil)
+      sayIt 'Device:' ((b2 << 8) | b1) 'code:' b3
+    }
+  }
+}
+
+to attachIR pin {
+  _ir_pin = pin
+}
+
+to attachIRTransmitter pin {
+  _ir_transmit_pin = pin
+}
+
+to interruptIRCapture {
+  comment 'Capture IR pulses using interrupt-based pulse capture system.'
+  atPut 'all' _ir_pulse_times 0
+  comment 'Wait for IR signal -- this is the start of a new message.
+Note: THe pin goes low when an IR signal is detected.'
+  waitUntil (not (digitalReadOp _ir_pin))
+  local 'start' (millisOp)
+  '[sensors:captureStart]' _ir_pin
+  comment 'Collect IR pulses until we receive over 67 pulses or until the timeout.'
+  repeatUntil (or (('[sensors:captureCount]') > 67) ((millisSince start) > 200)) {
+    waitMillis 5
+  }
+  local 'pulseData' ('[sensors:captureEnd]')
+  comment 'If we got at least 67 pulses, copy their absolute values (durations) into _ir_pulse_times.'
+  if ((size pulseData) >= 67) {
+    for i 67 {
+      atPut i _ir_pulse_times (absoluteValue (at i pulseData))
+    }
+  }
+}
+
+to ir_code_received {
+  return ((receiveIR) >= 0)
+}
+
+to ir_last_code {
+  return _ir_last_code
+}
+
+to receiveIR {
+  forever {
+    '_captureIRMessage'
+    if ('_got32Bits') {
+      local 'id_lowByte' ('_getIRByte' 4 nil)
+      local 'id_highByte' ('_getIRByte' 20 nil)
+      _ir_last_device = ((id_highByte << 8) | id_lowByte)
+      _ir_last_code = ('_getIRByte' 36 nil)
+      atPut 'all' _ir_pulse_times 0
+      return _ir_last_code
+    }
+  }
+}
+
+to timerIRCapture {
+  comment 'Capture IR pulses using the microseconds timer. (Original version, not currently used.)'
+  atPut 'all' _ir_pulse_times 0
+  local 'i' 1
+  comment 'Wait for IR signal -- this is the start of a new message.
+Note: THe pin goes low when an IR signal is detected.'
+  waitUntil (not (digitalReadOp _ir_pin))
+  local 'start' (microsOp)
+  forever {
+    comment 'Record the time until the end of the current IR pulse ("mark")'
+    waitUntil (digitalReadOp _ir_pin)
+    local 'end' (microsOp)
+    atPut i _ir_pulse_times (end - start)
+    i += 1
+    start = end
+    comment 'Record time until the start of the next IR pulse ("space")'
+    repeatUntil (not (digitalReadOp _ir_pin)) {
+      if (((microsOp) - start) > 5000) {
+        comment 'No IR pulse for 5000 usecs means "end of message"'
+        return 0
+      }
+    }
+    local 'end' (microsOp)
+    atPut i _ir_pulse_times (end - start)
+    i += 1
+    start = end
+  }
+}
+
+
+module 'MP3 Player' Output
+author MicroBlocks
+version 1 14 
+choices mp3PlayerType MakerPort 'MakerBit/HyperDuino' DFRobot Octopus 
+description 'Support for Octopus (FN-M16P and YX6300 chips) and DFRobot/HyperDuino/MakerBit/MakerPort) MP3 Players (YX5300, A19HFA440, and GD3300B chips).
+
+Sends commands to MP3 player using software serial via any digital pin on any board.
+
+To use the "mp3 play ... until done" block, connect TX of MP3 player to a second pin and set that pin as the optional "rx pin" in the "mp3 initialize" block .
+'
+variables _mp3UseChecksum _mp3Pin _mp3RxPin _mp3Status 
+
+  spec ' ' 'mp3_initialize' 'mp3 initialize _ pin _ : rx pin _' 'menu.mp3PlayerType num num' 'MakerPort' 20 21
+  spec ' ' 'mp3_setVolume' 'mp3 set volume _ (0-30)' 'num' 20
+  space
+  spec ' ' 'mp3_playTrack' 'mp3 play track _ in folder _' 'num num' 1 1
+  spec ' ' 'mp3_playTrackUntilDone' 'mp3 play track _ in folder _ until done' 'num num' 1 1
+  space
+  spec ' ' 'mp3_nextTrack' 'mp3 play next track'
+  spec ' ' 'mp3_repeatAllInFolder' 'mp3 repeat all in folder _' 'num' 1
+  space
+  spec ' ' 'mp3_pause' 'mp3 pause'
+  spec ' ' 'mp3_resume' 'mp3 resume'
+  space
+  spec ' ' '_mp3_sendMP3Cmd' '_mp3_sendMP3Cmd _ _ _' 'auto num num' '0x0C' 0 0
+  spec 'r' '_mp3_timeForResponse' '_mp3_timeForResponse timeout _ msecs' 'auto' 1000
+
+to '_mp3_sendMP3Cmd' cmd arg1 arg2 {
+  if (_mp3UseChecksum == 0) {
+    sayIt 'MP3 Player is not initialized'
+    return 0
+  }
+  if _mp3UseChecksum {
+    comment 'Include checksum (10 bytes total)'
+    local 'msg' ('[data:makeList]' (hexToInt '7E') (hexToInt 'FF') 6 (hexToInt cmd) 0 arg1 arg2 0 0 (hexToInt 'EF'))
+    local 'sum' 0
+    for i 6 {
+      sum += (at (i + 1) msg)
+    }
+    sum = (65536 - sum)
+    atPut 8 msg ((sum >> 8) & 255)
+    atPut 9 msg (sum & 255)
+  } else {
+    comment 'No checksum (8 bytes total)'
+    local 'msg' ('[data:makeList]' (hexToInt '7E') (hexToInt 'FF') 6 (hexToInt cmd) 0 arg1 arg2 (hexToInt 'EF'))
+  }
+  comment 'Send the command'
+  for byte msg {
+    '[io:softWriteByte]' byte _mp3Pin 9600
+  }
+  comment 'Leave some time for MP3 chip to process command'
+  waitMillis 5
+}
+
+to '_mp3_timeForResponse' timeout {
+  comment 'Wait for a response on _mp3RxPin for up to timeout milliseconds.
+Note: a low value on _mp3RxPin is the start of a response message.
+We do not read the actual message but wait 20 bytes worth of time.'
+  if (_mp3RxPin < 0) {
+    comment 'No _mp3RxPin'
+    return -1
+  }
+  local 'startMSecs' (millisOp)
+  local 'elapsed' 0
+  repeatUntil (or (not (digitalReadOp _mp3RxPin)) (elapsed > timeout)) {
+    elapsed = (millisSince startMSecs)
+  }
+  return elapsed
+}
+
+to mp3_initialize type pin optionalRxPin {
+  _mp3UseChecksum = ('Octopus' != type)
+  _mp3Pin = pin
+  _mp3RxPin = -1
+  if ((pushArgCount) > 2) {
+    _mp3RxPin = optionalRxPin
+  }
+  comment 'Reset the MP3 player'
+  '_mp3_sendMP3Cmd' '0x0C' 0 0
+  if (_mp3RxPin < 0) {
+    comment 'No _mp3RxPin; assume ok'
+    _mp3Status = 'ok'
+    waitMillis 1000
+  } else {
+    comment 'Has _mp3RxPin, determine MP3 player status'
+    if (('_mp3_timeForResponse' 1000) < 100) {
+      _mp3Status = 'no card'
+      return 0
+    }
+    waitMillis 500
+    comment 'Try to play a non-existent track; should respond in under 800 msecs.
+Times out when MP3 switch is in "files" mode.'
+    mp3_playTrack 87 87
+    if (('_mp3_timeForResponse' 800) >= 800) {
+      _mp3Status = 'files mode'
+    } else {
+      _mp3Status = 'ok'
+    }
+    waitMillis 500
+  }
+}
+
+to mp3_nextTrack {
+  comment 'Skip to the next track in the current folder, wrapping back to the first track.'
+  mp3_pause
+  comment 'Disable folder repeat'
+  '_mp3_sendMP3Cmd' '0x08' 0 0
+  waitMillis 50
+  '_mp3_sendMP3Cmd' '0x01' 0 0
+}
+
+to mp3_pause {
+  '_mp3_sendMP3Cmd' '0x0E' 0 0
+}
+
+to mp3_playTrack trackNum folderNum {
+  comment 'Play the given track in the given folder.
+If folder is 0, play the given track at the top level of the SD card.
+Folder names must start with two digits, 01-99.
+Track names in a folder must start with three digits, 001-999.
+Track names at the top level must start with four digits, 0001-9999.
+This sets the folder for the "play next track in folder" command.'
+  if (folderNum < 1) {
+    comment 'Play top-level track (e.g. 0001)'
+    '_mp3_sendMP3Cmd' '0x03' 0 trackNum
+  } else {
+    comment 'Play track in folder'
+    '_mp3_sendMP3Cmd' '0x0F' folderNum trackNum
+    comment 'Hack: Send command twice to increase reliability on MakerPort v1.00'
+    '_mp3_sendMP3Cmd' '0x0F' folderNum trackNum
+  }
+}
+
+to mp3_playTrackUntilDone trackNum folderNum {
+  if (_mp3RxPin < 0) {
+    sayIt 'To use this feature, set the RX pin in "mp3 initialize".'
+    return 0
+  }
+  if (_mp3Status != 'ok') {
+    sayIt 'MP3 Player is not available or the micro SD card is not inserted.'
+    return 0
+  }
+  mp3_playTrack trackNum folderNum
+  if (_mp3RxPin >= 0) {
+    waitUntil (not (digitalReadOp _mp3RxPin))
+  } else {
+    comment 'RX pin not set so just wait a few seconds.'
+    waitMillis 5000
+  }
+}
+
+to mp3_repeatAllInFolder folderNum {
+  comment 'Repeatedly play all files in the given folder. Does not work for top level (folder 0).'
+  '_mp3_sendMP3Cmd' '0x17' folderNum folderNum
+  mp3_resume
+}
+
+to mp3_resume {
+  '_mp3_sendMP3Cmd' '0x0D' 0 0
+}
+
+to mp3_setVolume level {
+  comment 'Range is 0-30'
+  '_mp3_sendMP3Cmd' '0x06' 0 level
+}
+
+
+module MakerPort Output
+author MicroBlocks
+version 2 3 
+depends 'LCD Display' 'MP3 Player' Tone Touch 'IR Remote' 
+choices makerport_audioSource MP3 Tone 
+choices makerport_loudnessPin 'mp3 player' 'analog pin (13)' 'extra pin (17)' 
+description 'Support for MakerPort (https://makerport.fun)'
+variables _makerport_microSDInserted 
+
+  spec ' ' 'makerport_initialize' 'MakerPort initialize'
+  space
+  spec ' ' 'makerport_setAllLEDs' 'set all MakerPort LEDs _' 'bool' true
+  space
+  spec ' ' 'makerport_beep' 'MakerPort tone _ Hz for _ msecs : volume _ (0-10)' 'num num num' 440 100 10
+  space
+  spec ' ' 'makerport_typeString' 'type _ to computer' 'str' 'Hello from MakerPort!'
+  space
+  spec 'r' 'makerport_loudness' 'loudness pin _' 'auto.makerport_loudnessPin' 'mp3 player'
+  spec 'r' 'makerport_mp3_hasCard' 'mp3 player has Flash card'
+
+to makerport_beep freq msecs optionalVolume {
+  if (freq < 1) {return 0}
+  local 'halfCycleTime' (500000 / freq)
+  local 'cycles' ((500 * msecs) / halfCycleTime)
+  local 'amplitude' (50 * (argOrDefault 3 10))
+  amplitude = (maximum 0 (minimum amplitude 1023))
+  repeat cycles {
+    analogWriteOp 0 amplitude
+    waitMicros halfCycleTime
+    analogWriteOp 0 0
+    waitMicros halfCycleTime
+  }
+}
+
+to makerport_initialize {
+  makerport_setAllLEDs false
+  mp3_initialize 'MakerPort' 20 21
+  attachIR 22
+}
+
+to makerport_loudness soundPin {
+  if ('mp3 player' == soundPin) {soundPin = 0}
+  if ('analog pin (13)' == soundPin) {soundPin = 13}
+  if ('extra pin (17)' == soundPin) {soundPin = 17}
+  local 'low' 10000
+  local 'high' -10000
+  for i 100 {
+    comment 'Sample sound for ~20 msecs at ~10000 samples/sec.'
+    local 'sample' (analogReadOp soundPin)
+    low = (minimum low sample)
+    high = (maximum high sample)
+    waitMicros 200
+  }
+  return (high - low)
+}
+
+to makerport_mp3_hasCard {
+  return (_mp3Status == 'ok')
+}
+
+to makerport_setAllLEDs bool {
+  for pin 12 {
+    digitalWriteOp pin bool
+  }
+}
+
+to makerport_typeString s {
+  for ch s {
+    '[hid:pressKey]' ch -1
+  }
+}
+
+
+module NeoPanel Output
+author 'José García Yeste & Víctor Casado'
+version 1 10 
+depends _NeoPixel _BMP 
+description 'Draw lines, rectangles, circles, text, and images on a NeoPixel panels (e.g. 8x8, 16x16 or 32x8) in either horizontal or vertical orientation. Panels can be daisy-chained to create larger displays if there is sufficient power to drive them.
+See: https://www.btf-lighting.com/collections/led-matrix-display/products/ws2812b-panel-screen-8-8-16-16-8-32-pixel-256-pixels-digital-flexible-led-programmed-individually-addressable-full-color-dc5v#
+'
+variables _neoPanel_width _neoPanel_height _neoPanel_isHorizontal _neoPanel_minimizeSpacing _neoPanel_zizag 
+
+  spec ' ' 'neoPanel_attach' 'attach NeoPixel panel width _ height _ at pin _' 'num num num' 8 8 1
+  space
+  spec ' ' 'neoPanel_drawPixel' 'NeoPanel set x _ y _ color _' 'num num color' 1 1
+  spec ' ' 'neoPanel_drawVerticalLine' 'NeoPanel fill column _ color _' 'num color' 1
+  spec ' ' 'neoPanel_drawHorizontalLine' 'NeoPanel fill row _ color _' 'num color' 1
+  space
+  spec ' ' 'neoPanel_draw_line' 'NeoPanel draw line from x _ y _ to x _ y _ color _' 'num num num num color' 1 1 8 8
+  spec ' ' 'neoPanel_draw_rectangle' 'NeoPanel draw rectangle at x _ y _ width _ height _ color _ : filled _' 'num num num num color bool' 1 1 8 8 nil true
+  spec ' ' 'neoPanel_draw_circle' 'NeoPanel draw circle at x _ y _ radius _ color _ : filled _' 'num num num color bool' 4 4 3 nil true
+  space
+  spec ' ' 'neoPanel_drawText' 'NeoPanel draw text _ at x _ y _ color _ : scale _ : separation _' 'str num num color num num' 'Hello' 1 1 nil 1 1
+  spec ' ' 'neoPanel_drawBMP' 'NeoPanel draw BMP file _ at x _ y _' 'str num num' 'aBitmap' 1 1
+  space
+  spec ' ' '_neoPanel_setPixel' '_NeoPanel_setPixel _ _  _' 'num num color' 1 1
+  spec ' ' '_neoPanel_drawline' '_NeoPanel_drawLine _ _ _ _ _' 'num num num num color' 1 1 8 8
+
+to '_neoPanel_drawline' x0 y0 x1 y1 color {
+  comment 'Bresenham''s Line Algorithm'
+  local 'dx' (absoluteValue (x1 - x0))
+  local 'dy' (0 - (absoluteValue (y1 - y0)))
+  if (dy == 0) {
+    for x ('[data:range]' x0 x1) {
+      '_neoPanel_setPixel' x y0 color
+    }
+  } (dx == 0) {
+    for y ('[data:range]' y0 y1) {
+      '_neoPanel_setPixel' x0 y color
+    }
+  } else {
+    local 'error' (dx + dy)
+    local 'sx' (ifExpression (x0 < x1) 1 -1)
+    local 'sy' (ifExpression (y0 < y1) 1 -1)
+    forever {
+      '_neoPanel_setPixel' x0 y0 color
+      local 'e2' (error * 2)
+      if (e2 >= dy) {
+        if (x0 == x1) {exitLoop}
+        error += dy
+        x0 += sx
+      }
+      if (e2 <= dx) {
+        if (y0 == y1) {exitLoop}
+        error += dx
+        y0 += sy
+      }
+    }
+  }
+}
+
+to '_neoPanel_setPixel' x y color {
+  if (and (and (x > 0) (y > 0)) (and (x <= _neoPanel_width) (y <= _neoPanel_height))) {if _neoPanel_zizag {
+    if _neoPanel_isHorizontal {
+      if ((x & 1) == 0) {
+        atPut (((x - 1) * _neoPanel_height) + ((_neoPanel_height - y) + 1)) _np_pixels color
+      } else {
+        atPut (((x - 1) * _neoPanel_height) + y) _np_pixels color
+      }
+    } else {
+      if ((y & 1) == 0) {
+        atPut (((y - 1) * _neoPanel_width) + x) _np_pixels color
+      } else {
+        atPut (((y - 1) * _neoPanel_width) + ((_neoPanel_width - x) + 1)) _np_pixels color
+      }
+    }
+  } else {
+    if _neoPanel_isHorizontal {
+      atPut (((y - 1) * _neoPanel_width) + x) _np_pixels color
+    } else {
+      atPut (((x - 1) * _neoPanel_height) + ((_neoPanel_height - y) + 1)) _np_pixels color
+    }
+  }}
+}
+
+to neoPanel_attach width height pin {
+  _neoPanel_width = width
+  _neoPanel_height = height
+  _neoPanel_isHorizontal = (width >= height)
+  if (_neoPanel_minimizeSpacing == 0) {
+    _neoPanel_minimizeSpacing = (booleanConstant true)
+  }
+  if ((boardType) == 'CoCube') {
+    digitalWriteOp 13 true
+    waitMillis 10
+    if (pin == 1) {
+      pin = 22
+    }
+  }
+  if (_neoPanel_zizag == 0) {
+    _neoPanel_zizag = ((boardType) != 'CoCube')
+  }
+  neoPixelAttach (_neoPanel_width * _neoPanel_height) pin
+}
+
+to neoPanel_drawBMP filename originX originY {
+  if ('_bmp_readHeader' filename) {
+    '_bmp_drawBMPPixels' filename originX originY '_neoPanel_setPixel'
+    '_NeoPixel_update'
+  }
+}
+
+to neoPanel_drawHorizontalLine y color {
+  neoPanel_draw_line 1 y _neoPanel_width y color
+}
+
+to neoPanel_drawPixel x y color {
+  '_neoPanel_setPixel' x y color
+  '_NeoPixel_update'
+}
+
+to neoPanel_drawText text x y color optionalScale optionalSeparation {
+  local 'scale' (argOrDefault 5 1)
+  local 'separation' (argOrDefault 6 1)
+  for char text {
+    local 'shape' ('[misc:shapeforChar]' char)
+    local 'y0' y
+    for c 5 {
+      local 'mask' 1
+      y = y0
+      repeat 8 {
+        if (((at c shape) & mask) != 0) {
+          repeat scale {
+            repeat scale {
+              '_neoPanel_setPixel' x y color
+              x += 1
+            }
+            x += (0 - scale)
+            y += 1
+          }
+        } else {
+          y += scale
+        }
+        mask = (mask << 1)
+      }
+      if (and _neoPanel_minimizeSpacing (or (c == 1) (c == 5))) {
+        if ((at c shape) != 0) {x += scale}
+      } else {
+        x += scale
+      }
+    }
+    if _neoPanel_isHorizontal {
+      y += (-8 * scale)
+      x += separation
+    } else {
+      x += (-5 * scale)
+      y += separation
+    }
+  }
+  '_NeoPixel_update'
+}
+
+to neoPanel_drawVerticalLine x color {
+  neoPanel_draw_line x 1 x _neoPanel_height color
+}
+
+to neoPanel_draw_circle x0 y0 radius color optionalFilled {
+  comment 'Bresenham circle algorithm'
+  local 'filled' (argOrDefault 5 (booleanConstant true))
+  local 'x' (-1 * radius)
+  local 'y' 0
+  local 'error' (2 - (2 * radius))
+  repeatUntil (x >= 0) {
+    if filled {
+      '_neoPanel_drawline' (x0 - x) (y0 + y) (x0 + x) (y0 + y) color
+      '_neoPanel_drawline' (x0 + y) (y0 + x) (x0 - y) (y0 + x) color
+    } else {
+      '_neoPanel_setPixel' (x0 - x) (y0 + y) color
+      '_neoPanel_setPixel' (x0 - y) (y0 - x) color
+      '_neoPanel_setPixel' (x0 + x) (y0 - y) color
+      '_neoPanel_setPixel' (x0 + y) (y0 + x) color
+    }
+    radius = error
+    if (radius <= y) {
+      y += 1
+      error = (error + ((y * 2) + 1))
+    }
+    if (or (radius > x) (error > y)) {
+      x += 1
+      error = (error + ((x * 2) + 1))
+    }
+  }
+  '_NeoPixel_update'
+}
+
+to neoPanel_draw_line x0 y0 x1 y1 color {
+  '_neoPanel_drawline' x0 y0 x1 y1 color
+  '_NeoPixel_update'
+}
+
+to neoPanel_draw_rectangle x y width height color optionalFilled {
+  local 'filled' (argOrDefault 6 (booleanConstant true))
+  if (and (width > 0) (height > 0)) {
+    comment 'first line'
+    '_neoPanel_drawline' x y (x + (width - 1)) y color
+    y += 1
+    if (height > 1) {
+      comment 'intermediate lines'
+      repeat (height - 2) {
+        if filled {
+          '_neoPanel_drawline' x y (x + (width - 1)) y color
+        } else {
+          '_neoPanel_setPixel' (x + (width - 1)) y color
+          '_neoPanel_setPixel' x y color
+        }
+        y += 1
+      }
+      comment 'last line'
+      '_neoPanel_drawline' x y (x + (width - 1)) y color
+    }
+    '_NeoPixel_update'
+  }
+}
+
+
+module NeoPixel Output
+author MicroBlocks
+version 1 15 
+description 'Control NeoPixel (WS2812) RGB LED strips and rings.
+'
+variables _np_pixels _np_pin _np_haswhite 
+
+  spec ' ' 'neoPixelAttach' 'attach _ LED NeoPixel strip to pin _ : has white _' 'num auto bool' 10 '' false
+  spec ' ' 'setNeoPixelColors10' 'set NeoPixels _ _ _ _ _ _ _ _ _ _' 'color color color color color color color color color color'
+  spec ' ' 'setNeoPixelColors25' 'set NeoPixels #BR# _ _ _ _ _ #BR# _ _ _ _ _ #BR# _ _ _ _ _ #BR# _ _ _ _ _ #BR# _ _ _ _ _' 'color color color color color color color color color color color color color color color color color color color color color color color color color'
+  spec ' ' 'clearNeoPixels' 'clear NeoPixels'
+  spec ' ' 'neoPixelSetAllToColor' 'set all NeoPixels color _' 'color'
+  spec ' ' 'setNeoPixelColor' 'set NeoPixel _ color _' 'num color' 1
+  space
+  spec 'r' 'neoPixel_colorSwatch' '_' 'color'
+  spec 'r' 'colorFromRGB' 'color r _ g _ b _ (0-255)' 'num num num' 0 100 100
+  space
+  spec ' ' 'rotateNeoPixelsBy' 'rotate NeoPixels by _' 'auto' 1
+  space
+  spec ' ' 'NeoPixel_brighten' 'brighten NeoPixel _ by _' 'num num' 1 10
+  spec ' ' 'NeoPixel_brighten_all' 'brighten all NeoPixels by _' 'num' 10
+  spec ' ' 'NeoPixel_shift_color' 'shift NeoPixel _ color by _' 'num num' 1 10
+  spec ' ' 'NeoPixel_shift_all_colors' 'shift all NeoPixel colors by _' 'num' 10
+  space
+  spec ' ' '_NeoPixel_ensureInitialized' '_NeoPixel_ensureInitialized'
+  spec ' ' '_NeoPixel_increaseRGB' '_NeoPixel_increaseRGB of _ by _' 'num num' 1 10
+  spec ' ' '_NeoPixel_rotate' '_NeoPixel_rotate_left _' 'bool' true
+  spec ' ' '_NeoPixel_update' '_NeoPixel_update'
+  spec ' ' '_NeoPixel_shift_hue' '_NeoPixel_shift_hue of _ by _' 'auto auto' '10' '10'
+
+to NeoPixel_brighten i delta {
+  '_NeoPixel_increaseRGB' i delta
+  '_NeoPixel_update'
+}
+
+to NeoPixel_brighten_all delta {
+  for i (size _np_pixels) {
+    '_NeoPixel_increaseRGB' i delta
+  }
+  '_NeoPixel_update'
+}
+
+to NeoPixel_shift_all_colors delta {
+  for i (size _np_pixels) {
+    '_NeoPixel_shift_hue' i delta
+  }
+  '_NeoPixel_update'
+}
+
+to NeoPixel_shift_color i delta {
+  '_NeoPixel_shift_hue' i delta
+  '_NeoPixel_update'
+}
+
+to '_NeoPixel_ensureInitialized' {
+  if (_np_pixels == 0) {if (or ((boardType) == 'M5Atom-Matrix') (or ((boardType) == 'Mbits') ((boardType) == 'micro:STEAMakers'))) {
+    neoPixelAttach 25 '' false
+  } ((boardType) == 'D1-Mini') {
+    comment 'D1 mini kit'
+    neoPixelAttach 7 15 false
+  } ((boardType) == 'Foxbit') {
+    neoPixelAttach 35 '' false
+  } ((boardType) == 'CodingBox') {
+    neoPixelAttach 35 '' false
+  } else {
+    neoPixelAttach 10 '' false
+  }}
+}
+
+to '_NeoPixel_increaseRGB' i delta {
+  if (or (i < 1) (i > (size _np_pixels))) {return}
+  local 'rgb' (at i _np_pixels)
+  if (rgb != 0) {
+    local 'h' ('[misc:hue]' rgb)
+    local 's' ('[misc:saturation]' rgb)
+    local 'v' (('[misc:brightness]' rgb) + delta)
+    v = (maximum 20 (minimum v 100))
+    atPut i _np_pixels ('[misc:hsvColor]' h s v)
+  }
+}
+
+to '_NeoPixel_rotate' left {
+  '_NeoPixel_ensureInitialized'
+  local 'length' (size _np_pixels)
+  if left {
+    local 'first' (at 1 _np_pixels)
+    for i (length - 1) {
+      atPut i _np_pixels (at (i + 1) _np_pixels)
+    }
+    atPut length _np_pixels first
+  } else {
+    local 'last' (at length _np_pixels)
+    for i (length - 1) {
+      atPut ((length - i) + 1) _np_pixels (at (length - i) _np_pixels)
+    }
+    atPut 1 _np_pixels last
+  }
+}
+
+to '_NeoPixel_shift_hue' i delta {
+  if (or (i < 1) (i > (size _np_pixels))) {return}
+  local 'rgb' (at i _np_pixels)
+  if (rgb != 0) {
+    local 'h' ((('[misc:hue]' rgb) + delta) % 360)
+    local 's' ('[misc:saturation]' rgb)
+    local 'v' ('[misc:brightness]' rgb)
+    atPut i _np_pixels ('[misc:hsvColor]' h s v)
+  }
+}
+
+to '_NeoPixel_update' {
+  comment 'NeoPixel pin and hasWhite may have been changed by another library.'
+  '[display:neoPixelSetPin]' _np_pin _np_hasWhite
+  '[display:neoPixelSend]' _np_pixels
+  waitMicros 300
+}
+
+to clearNeoPixels {
+  '_NeoPixel_ensureInitialized'
+  atPut 'all' _np_pixels 0
+  '_NeoPixel_update'
+}
+
+to colorFromRGB r g b {
+  r = (maximum 0 (minimum r 255))
+  g = (maximum 0 (minimum g 255))
+  b = (maximum 0 (minimum b 255))
+  return (((r << 16) | (g << 8)) | b)
+}
+
+to neoPixelAttach number pinNumber optionalHasWhite {
+  _np_pin = pinNumber
+  _np_hasWhite = false
+  if ((pushArgCount) > 2) {
+    _np_hasWhite = optionalHasWhite
+  }
+  if (or (_np_pixels == 0) (number != (size _np_pixels))) {
+    _np_pixels = (newList number)
+  }
+  atPut 'all' _np_pixels 0
+  '[display:neoPixelSetPin]' _np_pin _np_hasWhite
+}
+
+to neoPixelSetAllToColor color {
+  '_NeoPixel_ensureInitialized'
+  atPut 'all' _np_pixels color
+  '_NeoPixel_update'
+}
+
+to neoPixel_colorSwatch color {
+  return color
+}
+
+to rotateNeoPixelsBy n {
+  '_NeoPixel_ensureInitialized'
+  local 'rotateLeft' (n < 0)
+  if (or ((boardType) == 'CircuitPlayground') ((boardType) == 'CircuitPlayground Bluefruit')) {
+    rotateLeft = (n > 0)
+  }
+  repeat (absoluteValue n) {
+    '_NeoPixel_rotate' rotateLeft
+  }
+  '_NeoPixel_update'
+}
+
+to setNeoPixelColor i color {
+  '_NeoPixel_ensureInitialized'
+  if (and (1 <= i) (i <= (size _np_pixels))) {
+    atPut i _np_pixels color
+    '_NeoPixel_update'
+  }
+}
+
+to setNeoPixelColors10 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 {
+  '_NeoPixel_ensureInitialized'
+  for i (minimum (size _np_pixels) (pushArgCount)) {
+    atPut i _np_pixels (getArg i)
+  }
+  '_NeoPixel_update'
+}
+
+to setNeoPixelColors25 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 c16 c17 c18 c19 c20 c21 c22 c23 c24 c25 {
+  '_NeoPixel_ensureInitialized'
+  for i (minimum (size _np_pixels) (pushArgCount)) {
+    atPut i _np_pixels (getArg i)
+  }
+  '_NeoPixel_update'
+}
+
+
+module Servo Output
+author MicroBlocks
+version 1 4 
+tags servo motor angle rotation position 
+description 'Control both positional (angle) and rotational servo motors.
+'
+variables _servoPin _servoPulseWidth 
+
+  spec ' ' 'setServoAngle' 'set servo _ to _ degrees (-90 to 90)' 'num num' 1 90
+  spec ' ' 'setServoSpeed' 'set servo _ to speed _ (-100 to 100)' 'num num' 1 100
+  spec ' ' 'stopServo' 'stop servo _' 'num' 1
+  spec 'r' '_servoIndex' '_servoIndex _' 'num' 1
+  spec ' ' '_servoPulse' '_servoPulse pin _ usecs _' 'num num' 1 1500
+  spec ' ' '_servoUpdateLoop' '_servoUpdateLoop'
+
+to '_servoIndex' which {
+  if (_servoPin == 0) {
+    _servoPin = ('[data:makeList]')
+    _servoPulseWidth = ('[data:makeList]')
+    sendBroadcast '_servoUpdateLoop'
+  }
+  local 'i' ('[data:find]' which _servoPin)
+  if (i < 0) {
+    comment 'Add new pin'
+    '[data:addLast]' which _servoPin
+    '[data:addLast]' 1500 _servoPulseWidth
+    i = (size _servoPin)
+  }
+  return i
+}
+
+to '_servoPulse' pin usecs {
+  if (usecs == 0) {
+    comment 'Servo stopped; do nothing'
+    return 0
+  }
+  usecs = (maximum 500 (minimum usecs 2900))
+  comment 'Split wait into a long wait followed by a wait of <= 30 usecs for greater accuracy'
+  local 'endTime' ((microsOp) + usecs)
+  digitalWriteOp pin true
+  waitMicros (usecs - 30)
+  waitMicros (endTime - (microsOp))
+  digitalWriteOp pin false
+}
+
+to '_servoUpdateLoop' {
+  forever {
+    if (_servoPin != 0) {
+      comment 'If the _servoPin list is not 0, update the servos'
+      for i (size _servoPin) {
+        local 'pin' (at i _servoPin)
+        local 'usecs' (at i _servoPulseWidth)
+        if (and (pin >= 0) (usecs != 0)) {
+          '_servoPulse' pin usecs
+        }
+      }
+      waitMillis 15
+    }
+  }
+}
+
+to setServoAngle which degrees optionalReverse {
+  local 'reversed' false
+  if ((pushArgCount) > 2) {
+    reversed = optionalReverse
+  }
+  if reversed {
+    degrees = (0 - degrees)
+  }
+  local 'pulseWidth' (1500 - (10 * degrees))
+  if ('[io:hasServo]') {
+    '[io:setServo]' which pulseWidth
+  } else {
+    atPut ('_servoIndex' which) _servoPulseWidth pulseWidth
+  }
+}
+
+to setServoSpeed which speed optionalReverse {
+  local 'reversed' false
+  if ((pushArgCount) > 2) {
+    reversed = optionalReverse
+  }
+  if reversed {
+    speed = (0 - speed)
+  }
+  local 'pulseWidth' (1500 - (10 * speed))
+  if ((absoluteValue speed) < 2) {
+    pulseWidth = 0
+  }
+  if ('[io:hasServo]') {
+    '[io:setServo]' which pulseWidth
+  } else {
+    atPut ('_servoIndex' which) _servoPulseWidth pulseWidth
+  }
+}
+
+to stopServo which {
+  if ('[io:hasServo]') {
+    '[io:setServo]' which 0
+  } else {
+    atPut ('_servoIndex' which) _servoPulseWidth 0
+  }
+}
+
+
+module Tone Output
+author MicroBlocks
+version 1 10 
+tags tone sound music audio note speaker 
+choices tone_NoteName 'nt;c' 'nt;c#' 'nt;d' 'nt;d#' 'nt;e' 'nt;f' 'nt;f#' 'nt;g' 'nt;g#' 'nt;a' 'nt;a#' 'nt;b' 
+description 'Audio tone generation. Make music with MicroBlocks!
+'
+variables _tonePin _toneInitalized _toneLoopOverhead _toneNoteNames _toneArezzoNotes _toneFrequencies 
+
+  spec ' ' 'play tone' 'play note _ octave _ for _ ms' 'str.tone_NoteName num num' 'nt;c' 0 500
+  spec ' ' 'playMIDIKey' 'play midi key _ for _ ms' 'num num' 60 500
+  spec ' ' 'play frequency' 'play frequency _ for _ ms' 'num num' 261 500
+  space
+  spec ' ' 'startTone' 'start tone _ Hz' 'num' 440
+  spec ' ' 'stopTone' 'stop tone'
+  space
+  spec ' ' 'attach buzzer to pin' 'attach buzzer to pin _' 'auto' ''
+  space
+  spec 'r' '_measureLoopOverhead' '_measureLoopOverhead'
+  spec 'r' '_baseFreqForNote' '_baseFreqForNote _' 'auto' 'c'
+  spec 'r' '_baseFreqForSemitone' '_baseFreqForSemitone _' 'num' 0
+  spec ' ' '_toneLoop' '_toneLoop _ for _ ms' 'num num' 440000 100
+  spec 'r' '_trimmedLowercase' '_trimmedLowercase _' 'str' 'A. b C...'
+  spec ' ' '_tone init note names' '_tone init note names'
+
+to '_baseFreqForNote' note {
+  comment 'Return the frequency for the given note in the middle-C octave
+scaled by 1000. For example, return 440000 (440Hz) for A.
+Note names may be upper or lower case. Note names
+may be followed by # for a sharp or b for a flat.'
+  local 'normalized note' ('_trimmedLowercase' note)
+  'normalized note' = (ifExpression ((at 1 (v 'normalized note')) == 'n') (v 'normalized note') ('[data:join]' 'nt;' (v 'normalized note')))
+  '_tone init note names'
+  if (('[data:find]' (v 'normalized note') _toneArezzoNotes) > 0) {
+    return ('_baseFreqForSemitone' ('[data:find]' (v 'normalized note') _toneArezzoNotes))
+  } else {
+    return ('_baseFreqForSemitone' ('[data:find]' (v 'normalized note') _toneNoteNames))
+  }
+}
+
+to '_baseFreqForSemitone' semitone {
+  if (_toneFrequencies == 0) {_toneFrequencies = ('[data:makeList]' 261626 277183 293665 311127 329628 349228 369994 391995 415305 440000 466164 493883 246942 277183 277183 311127 311127 349228 329628 369994 369994 415305 415305 466164 466164 523252)}
+  if (and (1 <= semitone) (semitone <= (size _toneFrequencies))) {
+    return (at semitone _toneFrequencies)
+  } else {
+    comment 'Bad note name; return 10 Hz'
+    return 10000
+  }
+}
+
+to '_measureLoopOverhead' {
+  comment 'Measure the loop overhead on this device'
+  local 'halfCycle' 100
+  local 'startT' (microsOp)
+  repeat 100 {
+    digitalWriteOp _tonePin false
+    waitMicros halfCycle
+    digitalWriteOp _tonePin false
+    waitMicros halfCycle
+  }
+  local 'usecs' ((microsOp) - startT)
+  return ((usecs - 20000) / 200)
+}
+
+to '_tone init note names' {
+  if (_toneNoteNames == 0) {
+    _toneNoteNames = ('[data:makeList]' 'nt;c' 'nt;c#' 'nt;d' 'nt;d#' 'nt;e' 'nt;f' 'nt;f#' 'nt;g' 'nt;g#' 'nt;a' 'nt;a#' 'nt;b' 'nt;c_' 'nt;db' 'nt;d_' 'nt;eb' 'nt;e_' 'nt;e#' 'nt;f_' 'nt;gb' 'nt;g_' 'nt;ab' 'nt;a_' 'nt;bb' 'nt;b_' 'nt;b#')
+    _toneArezzoNotes = ('[data:makeList]' 'nt;do' 'nt;do#' 'nt;re' 'nt;re#' 'nt;mi' 'nt;fa' 'nt;fa#' 'nt;sol' 'nt;sol#' 'nt;la' 'nt;la#' 'nt;si' 'nt;do_' 'nt;dob' 'nt;re_' 'nt;reb' 'nt;mi_' 'nt;mi#' 'nt;fa_' 'nt;solb' 'nt;sol_' 'nt;lab' 'nt;la_' 'nt;sib' 'nt;si_' 'nt;si#')
+  }
+}
+
+to '_toneLoop' scaledFreq ms {
+  if (_toneInitalized == 0) {'attach buzzer to pin' ''}
+  if ('[io:hasTone]') {
+    '[io:playTone]' _tonePin (scaledFreq / 1000)
+    waitMillis ms
+    '[io:playTone]' _tonePin 0
+  } else {
+    local 'halfCycle' ((500000000 / scaledFreq) - _toneLoopOverhead)
+    local 'cycles' ((ms * 500) / halfCycle)
+    repeat cycles {
+      digitalWriteOp _tonePin true
+      waitMicros halfCycle
+      digitalWriteOp _tonePin false
+      waitMicros halfCycle
+    }
+  }
+}
+
+to '_trimmedLowercase' s {
+  comment 'Return a copy of the given string without whitespace
+or periods and all lowercase.'
+  local 'result' (newList (size s))
+  '[data:delete]' 'all' result
+  for i (size s) {
+    local 'ch' ('[data:unicodeAt]' i s)
+    if (and (ch > 32) (ch != 46)) {
+      if (and (65 <= ch) (ch <= 90)) {ch = (ch + 32)}
+      '[data:addLast]' ch result
+    }
+  }
+  return ('[data:unicodeString]' result)
+}
+
+to 'attach buzzer to pin' pinNumber {
+  if (pinNumber == '') {
+    comment 'Pin number not specified; use default pin for this device'
+    if ((boardType) == 'Citilab ED1') {
+      _tonePin = 26
+    } ((boardType) == 'M5Stack-Core') {
+      _tonePin = 25
+    } ((boardType) == 'M5StickC') {
+      _tonePin = 26
+    } ((boardType) == 'Calliope') {
+      digitalWriteOp 23 true
+      digitalWriteOp 24 true
+      _tonePin = 25
+    } ((boardType) == 'D1-Mini') {
+      _tonePin = 12
+    } ((boardType) == 'CodingBox') {
+      _tonePin = 32
+    } else {
+      _tonePin = -1
+    }
+  } else {
+    _tonePin = pinNumber
+  }
+  _toneLoopOverhead = ('_measureLoopOverhead')
+  _toneInitalized = (booleanConstant true)
+}
+
+to 'play frequency' freq ms {
+  '_toneLoop' (freq * 1000) ms
+}
+
+to 'play tone' note octave ms {
+  local 'freq' ('_baseFreqForNote' note)
+  if (freq <= 10000) {
+    waitMillis ms
+    return 0
+  }
+  if (octave < 0) {
+    repeat (absoluteValue octave) {
+      freq = (freq / 2)
+    }
+  }
+  repeat octave {
+    freq = (freq * 2)
+  }
+  '_toneLoop' freq ms
+}
+
+to playMIDIKey key ms {
+  local 'freq' ('_baseFreqForSemitone' ((key % 12) + 1))
+  local 'octave' ((key / 12) - 5)
+  if (octave < 0) {
+    repeat (absoluteValue octave) {
+      freq = (freq / 2)
+    }
+  }
+  repeat octave {
+    freq = (freq * 2)
+  }
+  '_toneLoop' freq ms
+}
+
+to startTone freq {
+  if (_toneInitalized == 0) {'attach buzzer to pin' ''}
+  if ('[io:hasTone]') {'[io:playTone]' _tonePin freq}
+}
+
+to stopTone {
+  startTone 0
+}
+
+
+module Touch Input
+author MicroBlocks
+version 1 13 
+description 'Support for one or two MPR121 12-channel i2c touch sensors.
+Detects MPR121 chips at I2C addresses 90 and, optionally, 92 to handle up to 24 touch pins.
+'
+variables _touch_pinCount _touch_state _touch_isTouched _touch_eventPending _touch_last_touched_pin _touch_last_released_pin 
+
+  spec 'r' 'touch_isTouched' 'is pin _ touched?' 'menu.range:1-24' 1
+  space
+  spec 'r' 'touch_touch_event' 'pin touch event'
+  spec 'r' 'touch_last_touched_pin' 'last touched pin'
+  space
+  spec 'r' 'touch_release_event' 'pin release event'
+  spec 'r' 'touch_last_released_pin' 'last released pin'
+  space
+  spec 'r' 'touch_state_string' 'touch state string'
+  space
+  spec ' ' '_touch_init' '_touch_init'
+  spec ' ' '_touch_update' '_touch_update'
+  spec ' ' '_touch_setRegister' '_touch_setRegister _ to _' 'auto auto' 'hex register' 'hex value'
+  spec 'r' '_touch_readState' '_touch_readState _' 'num' 90
+
+to '_touch_init' {
+  if (isType _touch_isTouched 'list') {
+    comment 'Already initialized.'
+    return 0
+  }
+  _touch_pinCount = 0
+  if ((i2cGet 90 0) >= 0) {
+    _touch_pinCount = 12
+  }
+  if ((i2cGet 92 0) >= 0) {
+    _touch_pinCount = 24
+  }
+  _touch_isTouched = (newList _touch_pinCount (booleanConstant false))
+  _touch_eventPending = (newList _touch_pinCount (booleanConstant false))
+  _touch_last_touched_pin = -1
+  _touch_last_released_pin = -1
+  waitMillis 30
+  comment 'Soft reset -- sets all registers to defaults'
+  '_touch_setRegister' '0x80' '0x63'
+  comment 'Set filter parameters'
+  '_touch_setRegister' '0x2B' '0x01'
+  '_touch_setRegister' '0x2C' '0x01'
+  '_touch_setRegister' '0x2D' '0x10'
+  '_touch_setRegister' '0x2E' '0x20'
+  '_touch_setRegister' '0x2F' '0x01'
+  '_touch_setRegister' '0x30' '0x01'
+  '_touch_setRegister' '0x31' '0x10'
+  '_touch_setRegister' '0x32' '0x20'
+  '_touch_setRegister' '0x33' '0x01'
+  '_touch_setRegister' '0x34' '0x10'
+  '_touch_setRegister' '0x35' '0xFF'
+  comment 'Init debounce and config registers'
+  '_touch_setRegister' '0x5B' '0x11'
+  '_touch_setRegister' '0x5C' '0xFF'
+  '_touch_setRegister' '0x5D' '0x30'
+  comment 'Set touch/release thresholds'
+  local 'touchThreshold' 20
+  local 'releaseThreshold' 40
+  for i 12 {
+    local 'reg' ((hexToInt '40') + (2 * i))
+    '_touch_setRegister' (reg - 1) touchThreshold
+    '_touch_setRegister' reg releaseThreshold
+  }
+  comment 'Start tracking all inputs (proximity detection disabled)'
+  '_touch_setRegister' '0x5E' '0xCC'
+}
+
+to '_touch_readState' addr {
+  '[sensors:i2cWrite]' addr ('[data:makeList]' 0)
+  local 'bytes' (newList 2)
+  '[sensors:i2cRead]' addr bytes
+  return (((at 2 bytes) << 8) | (at 1 bytes))
+}
+
+to '_touch_setRegister' reg value {
+  local 'addr1' 90
+  local 'addr2' 92
+  if (isType reg 'string') {
+    reg = (hexToInt reg)
+  }
+  if (isType value 'string') {
+    value = (hexToInt value)
+  }
+  i2cSet addr1 reg value
+  if (_touch_pinCount > 12) {
+    i2cSet addr2 reg value
+  }
+}
+
+to '_touch_update' {
+  '_touch_init'
+  _touch_state = 0
+  if (_touch_pinCount > 0) {
+    _touch_state = ('_touch_readState' 90)
+  }
+  if (_touch_pinCount > 12) {
+    _touch_state = ((('_touch_readState' 92) << 12) | _touch_state)
+  }
+  for i _touch_pinCount {
+    local 'isTouchedNow' ((_touch_state & (1 << (i - 1))) != 0)
+    if ((at i _touch_isTouched) != isTouchedNow) {
+      atPut i _touch_isTouched isTouchedNow
+      atPut i _touch_eventPending (booleanConstant true)
+    }
+  }
+  comment 'Leave some time between updates'
+  waitMillis 30
+}
+
+to touch_isTouched pin {
+  '_touch_init'
+  if (or (pin < 1) (pin > _touch_pinCount)) {
+    return (booleanConstant false)
+  }
+  '_touch_update'
+  return ((_touch_state & (1 << (pin - 1))) != 0)
+}
+
+to touch_last_released_pin {
+  comment 'Return the pin that triggered the last release event.'
+  '_touch_init'
+  return _touch_last_released_pin
+}
+
+to touch_last_touched_pin {
+  comment 'Return the pin that triggered the last touch event.'
+  '_touch_init'
+  return _touch_last_touched_pin
+}
+
+to touch_release_event {
+  '_touch_update'
+  for i _touch_pinCount {
+    if (and (at i _touch_eventPending) ((_touch_state & (1 << (i - 1))) == 0)) {
+      atPut i _touch_eventPending (booleanConstant false)
+      _touch_last_released_pin = i
+      return (booleanConstant true)
+    }
+  }
+  _touch_last_released_pin = -1
+  return (booleanConstant false)
+}
+
+to touch_state_string {
+  '_touch_update'
+  local 'pin states' ('[data:makeList]')
+  for i _touch_pinCount {
+    if ((_touch_state & (1 << (i - 1))) != 0) {
+      '[data:addLast]' '1' (v 'pin states')
+    } else {
+      '[data:addLast]' '0' (v 'pin states')
+    }
+  }
+  return ('[data:joinStrings]' (v 'pin states'))
+}
+
+to touch_touch_event {
+  '_touch_update'
+  for i _touch_pinCount {
+    if (and (at i _touch_eventPending) ((_touch_state & (1 << (i - 1))) != 0)) {
+      atPut i _touch_eventPending (booleanConstant false)
+      _touch_last_touched_pin = i
+      return (booleanConstant true)
+    }
+  }
+  _touch_last_touched_pin = -1
+  return (booleanConstant false)
+}
+
